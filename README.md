@@ -1,0 +1,1 @@
+Maze generation algorithm demo.
