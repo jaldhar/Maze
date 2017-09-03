@@ -20,8 +20,14 @@ int main() {
         }
     }
 
-    int done = 0;
+    vector<pair<int, int>> dirs {
+        make_pair(-1,0),
+        make_pair(1,0),
+        make_pair(0,-1),
+        make_pair(0,1)
+    };
 
+    int done = 0;
 
     do {
         // this code is used to make sure the numbers are odd
@@ -34,11 +40,6 @@ int main() {
         }
 
         if(_map[row][col]) {
-            vector<pair<int, int>> dirs;
-            dirs.push_back(make_pair(-1,0));
-            dirs.push_back(make_pair(1,0));
-            dirs.push_back(make_pair(0,-1));
-            dirs.push_back(make_pair(0,1));
 
             //Randomize Directions
             random_shuffle(dirs.begin(), dirs.end());
