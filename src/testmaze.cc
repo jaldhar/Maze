@@ -9,8 +9,11 @@ constexpr int MAP_HEIGHT = 17;
 constexpr int MAP_WIDTH = 17;
 constexpr float CELL_HEIGHT = 32;
 constexpr float CELL_WIDTH = 32;
+constexpr float TICK = 1 / 60.0f;
 
 using Maze = std::array<std::array<bool, MAP_WIDTH>, MAP_HEIGHT>;
+
+enum class GO { EAST, SOUTH, WEST, NORTH };
 
 struct Position {
     int row_;
@@ -21,20 +24,55 @@ class Model {
 public:
     Model();
 
+    void update();
+
     Maze maze_;
     Position entrance_;
     Position exit_;
+    Position player_;
+    float tick_;
 
 private:
+    GO direction_;
+
     Maze makeMaze();
     Position makeEntrance();
     Position makeExit();
+    void tryNorth();
+    void tryEast();
+    void tryWest();
+    void trySouth();
 };
 
-Model::Model() : maze_{makeMaze()},entrance_{makeEntrance()}, exit_{makeExit()}
-{
+Model::Model() : maze_{makeMaze()},entrance_{makeEntrance()}, exit_{makeExit()},
+player_{entrance_}, tick_{0}, direction_{GO::SOUTH} {
     maze_[entrance_.row_][entrance_.col_] = true;
     maze_[exit_.row_][exit_.col_] = true;
+}
+
+void Model::update() {
+    if (player_.row_ == exit_.row_ && player_.col_ == exit_.col_) {
+        return;
+    }
+
+    switch (direction_) {
+        case GO::NORTH:
+            player_.row_--;
+            tryNorth();
+            break;
+         case GO::EAST:
+            player_.col_++;
+            tryEast();
+            break;
+        case GO::SOUTH:
+            player_.row_++;
+            trySouth();
+            break;
+        case GO::WEST:
+            player_.col_--;
+            tryWest();
+            break;
+   }
 }
 
 Maze Model::makeMaze() {
@@ -133,6 +171,55 @@ Position Model::makeExit() {
     return {MAP_HEIGHT - 1, freeCols[rand() % freeCols.size()] };
 }
 
+void Model::tryNorth() {
+    if (maze_[player_.row_][player_.col_ + 1]) {
+        direction_ = GO::EAST;
+    } else if(maze_[player_.row_ - 1][player_.col_]) {
+        direction_ = GO::NORTH;
+    } else if (maze_[player_.row_][player_.col_ - 1]) {
+        direction_ = GO::WEST;
+    } else if(maze_[player_.row_ + 1][player_.col_]) {
+        direction_ = GO::SOUTH;
+    }
+}
+
+void Model::tryEast() {
+    if (maze_[player_.row_ + 1][player_.col_]) {
+        direction_ = GO::SOUTH;
+    } else if(maze_[player_.row_][player_.col_ + 1]) {
+        direction_ = GO::EAST;
+    } else if(maze_[player_.row_ - 1][player_.col_]) {
+        direction_ = GO::NORTH;
+    } else if(maze_[player_.row_][player_.col_ - 1]) {
+        direction_ = GO::WEST;
+    }
+}
+
+void Model::trySouth() {
+    if (maze_[player_.row_][player_.col_ - 1]) {
+        direction_ = GO::WEST;
+    } else if (maze_[player_.row_ + 1][player_.col_]) {
+        direction_ = GO::SOUTH;
+    } else if (maze_[player_.row_][player_.col_ + 1]) {
+        direction_ = GO::EAST;
+    } else if (maze_[player_.row_ - 1][player_.col_]) {
+        direction_ = GO::NORTH;
+    }
+}
+
+void Model::tryWest() {
+    if (maze_[player_.row_ - 1][player_.col_]) {
+        direction_ = GO::NORTH;
+        player_.row_--;
+    } else if (maze_[player_.row_][player_.col_ - 1]) {
+        direction_ = GO::WEST;
+    } else if (maze_[player_.row_ + 1][player_.col_]) {
+        direction_ = GO::SOUTH;
+    } else if (maze_[player_.row_][player_.col_ + 1]) {
+        direction_ = GO::EAST;
+    }
+}
+
 class View : public olc::PixelGameEngine {
 public:
     explicit View(Model);
@@ -158,7 +245,14 @@ bool View::OnUserCreate() {
 }
 
 bool View::OnUserUpdate(float elapsedTime) {
-    draw();
+    model_.tick_ += elapsedTime;
+
+    if (model_.tick_ > TICK) {
+        model_.tick_ = 0;
+        model_.update();
+        draw();
+    }
+
     return true;
 }
 
@@ -172,6 +266,8 @@ void View::draw() {
            }
        }
    }
+
+   Draw(model_.player_.col_, model_.player_.row_, player_);
 }
 
 int main() {
