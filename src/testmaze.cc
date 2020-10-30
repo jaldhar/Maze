@@ -5,26 +5,34 @@
 #include <ctime>
 #include <vector>
 #include <utility>
-using namespace std;
 
-static const int MAP_HEIGHT = 17;
-static const int MAP_WIDTH = 17;
+constexpr int MAP_HEIGHT = 17;
+constexpr int MAP_WIDTH = 17;
 
-int main() {
-    srand(time(NULL));
-    array<array<bool, MAP_WIDTH>, MAP_HEIGHT> _map;
+using Maze = std::array<std::array<bool, MAP_WIDTH>, MAP_HEIGHT>;
 
-    for (auto & row : _map) {
+struct Position {
+    int row_;
+    int col_;
+};
+
+Position makeEntrance(const Maze&);
+Position makeExit(const Maze&);
+
+Maze makeMaze() {
+    Maze maze;
+
+    for (auto & row : maze) {
         for (auto & col : row) {
             col = false;
         }
     }
 
-    vector<pair<int, int>> dirs {
-        make_pair(-1,0),
-        make_pair(1,0),
-        make_pair(0,-1),
-        make_pair(0,1)
+    std::array<Position, 4> dirs {
+        Position{-1, 0}, // North
+        Position{1,  0}, // South
+        Position{0, -1}, // West
+        Position{0,  1}  // East
     };
 
     int done = 0;
@@ -36,32 +44,32 @@ int main() {
         int col = 1 + rand() % ((MAP_WIDTH - 1) / 2) * 2;
 
         if (done == 0) {
-            _map[row][col] = true;
+            maze[row][col] = true;
         }
 
-        if(_map[row][col]) {
+        if(maze[row][col]) {
 
             //Randomize Directions
-            random_shuffle(dirs.begin(), dirs.end());
+            std::random_shuffle(dirs.begin(), dirs.end());
 
             bool blocked = true;
 
             do {
                 if (rand() % 5 == 0) {
-                    random_shuffle(dirs.begin(), dirs.end());
+                    std::random_shuffle(dirs.begin(), dirs.end());
                 }
                 blocked = true;
-                for (int i = 0; i < 4; i++) {
+                for (auto i = 0; i < 4; i++) {
                     // Determine which direction the tile is
-                    int r = row + dirs[i].first * 2;
-                    int c = col + dirs[i].second * 2;
+                    auto r = row + dirs[i].row_ * 2;
+                    auto c = col + dirs[i].col_ * 2;
                     //Check to see if the tile can be used
                     if (r >= 1 && r < MAP_HEIGHT - 1 && c >= 1 && c < MAP_WIDTH - 1) {
-                        if (!_map[r][c]) {
+                        if (!maze[r][c]) {
                             //create destination location
-                            _map[r][c] = true;
+                            maze[r][c] = true;
                             //create intermediate location
-                            _map[row + dirs[i].first][col + dirs[i].second] = true;
+                            maze[row + dirs[i].row_][col + dirs[i].col_] = true;
                             row = r;
                             col = c;
                             blocked = false;
@@ -76,28 +84,58 @@ int main() {
 
     } while (done + 1 < ((MAP_HEIGHT - 1) * (MAP_WIDTH - 1)) / 4);
 
-    vector<int> freeCols;
-    for (int i = 1; i < MAP_WIDTH - 1; i++) {
-        if (_map[1][i]) {
+    auto entrance = makeEntrance(maze);
+    maze[entrance.row_][entrance.col_] = true;
+
+    auto exit = makeExit(maze);
+    maze[exit.row_][exit.col_] = true;
+
+    return maze;
+}
+
+// Set the entrance on the top row.  it has to be above an empty cell on the
+// next row.  The freeCols vector contains the list of empty cells.
+Position makeEntrance(const Maze& maze) {
+    std::vector<int> freeCols;
+
+    for (auto i = 1; i < MAP_WIDTH - 1; i++) {
+        if (maze[1][i]) {
             freeCols.push_back(i);
         }
     }
-    _map[0][freeCols[rand() % freeCols.size()]] = true;
 
-    freeCols.clear();
-    for (int i = 1; i < MAP_WIDTH - 1; i++) {
-        if (_map[MAP_HEIGHT - 2][i]) {
+    return {0, freeCols[rand() % freeCols.size()] };
+}
+
+// Set the exit on the bottom row.  it has to be below an empty cell on the
+// previous row.  Once again, freeCols contains the list of empty cells. 
+Position makeExit(const Maze& maze) {
+    std::vector<int> freeCols;
+
+    for (auto i = 1; i < MAP_WIDTH - 1; i++) {
+        if (maze[MAP_HEIGHT - 2][i]) {
             freeCols.push_back(i);
         }
     }
-    _map[MAP_HEIGHT - 1][freeCols[rand() % freeCols.size()]] = true;
 
-    for (auto & row : _map) {
+    return {MAP_HEIGHT - 1, freeCols[rand() % freeCols.size()] };
+}
+
+void draw(const Maze& maze) {
+    for (auto & row : maze) {
         for (auto & col : row) {
             putchar(col ? '.' : '#');
         }
         putchar('\n');
     }
+}
+
+int main() {
+    srand(time(NULL));
+
+    auto maze = makeMaze();
+
+    draw(maze);
 
     return 0;
 }
