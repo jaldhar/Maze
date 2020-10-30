@@ -17,7 +17,7 @@ DEPFLAGS=-MT $@ -MMD -MP -MF $*.d
 CPPFLAGS+=$(DEPFLAGS) -I$(INCDIR) $(NCURSESFLAGS)
 CXXFLAGS+=-std=c++17 -Wall -Wextra -Wpedantic -Weffc++ -flto
 LDFLAGS+=-ffunction-sections -fdata-sections -Wl,-gc-sections
-LIBS=
+LIBS=-lX11 -lGL -lpthread -lpng -lstdc++fs
 get_builddir = '$(findstring '$(notdir $(CURDIR))', 'debug' 'release')'
 
 .cc.o:

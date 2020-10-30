@@ -1,13 +1,14 @@
-#include <algorithm>
 #include <array>
-#include <cstdio>
 #include <cstdlib>
 #include <ctime>
-#include <vector>
-#include <utility>
+
+#define OLC_PGE_APPLICATION
+#include "olcPixelGameEngine.h"
 
 constexpr int MAP_HEIGHT = 17;
 constexpr int MAP_WIDTH = 17;
+constexpr float CELL_HEIGHT = 32;
+constexpr float CELL_WIDTH = 32;
 
 using Maze = std::array<std::array<bool, MAP_WIDTH>, MAP_HEIGHT>;
 
@@ -16,10 +17,27 @@ struct Position {
     int col_;
 };
 
-Position makeEntrance(const Maze&);
-Position makeExit(const Maze&);
+class Model {
+public:
+    Model();
 
-Maze makeMaze() {
+    Maze maze_;
+    Position entrance_;
+    Position exit_;
+
+private:
+    Maze makeMaze();
+    Position makeEntrance();
+    Position makeExit();
+};
+
+Model::Model() : maze_{makeMaze()},entrance_{makeEntrance()}, exit_{makeExit()}
+{
+    maze_[entrance_.row_][entrance_.col_] = true;
+    maze_[exit_.row_][exit_.col_] = true;
+}
+
+Maze Model::makeMaze() {
     Maze maze;
 
     for (auto & row : maze) {
@@ -84,22 +102,16 @@ Maze makeMaze() {
 
     } while (done + 1 < ((MAP_HEIGHT - 1) * (MAP_WIDTH - 1)) / 4);
 
-    auto entrance = makeEntrance(maze);
-    maze[entrance.row_][entrance.col_] = true;
-
-    auto exit = makeExit(maze);
-    maze[exit.row_][exit.col_] = true;
-
     return maze;
 }
 
 // Set the entrance on the top row.  it has to be above an empty cell on the
 // next row.  The freeCols vector contains the list of empty cells.
-Position makeEntrance(const Maze& maze) {
+Position Model::makeEntrance() {
     std::vector<int> freeCols;
 
     for (auto i = 1; i < MAP_WIDTH - 1; i++) {
-        if (maze[1][i]) {
+        if (maze_[1][i]) {
             freeCols.push_back(i);
         }
     }
@@ -109,11 +121,11 @@ Position makeEntrance(const Maze& maze) {
 
 // Set the exit on the bottom row.  it has to be below an empty cell on the
 // previous row.  Once again, freeCols contains the list of empty cells. 
-Position makeExit(const Maze& maze) {
+Position Model::makeExit() {
     std::vector<int> freeCols;
 
     for (auto i = 1; i < MAP_WIDTH - 1; i++) {
-        if (maze[MAP_HEIGHT - 2][i]) {
+        if (maze_[MAP_HEIGHT - 2][i]) {
             freeCols.push_back(i);
         }
     }
@@ -121,21 +133,56 @@ Position makeExit(const Maze& maze) {
     return {MAP_HEIGHT - 1, freeCols[rand() % freeCols.size()] };
 }
 
-void draw(const Maze& maze) {
-    for (auto & row : maze) {
-        for (auto & col : row) {
-            putchar(col ? '.' : '#');
-        }
-        putchar('\n');
-    }
+class View : public olc::PixelGameEngine {
+public:
+    explicit View(Model);
+
+    void draw();
+    bool OnUserCreate() override;
+    bool OnUserUpdate(float) override;
+
+private:
+    Model& model_;
+    olc::Pixel wall_;
+    olc::Pixel floor_;
+    olc::Pixel player_;
+};
+
+View::View(Model model) : model_{model}, wall_{olc::BLACK},
+floor_{olc::WHITE}, player_{olc::MAGENTA} {
+    sAppName = "Maze Demo";
+}
+
+bool View::OnUserCreate() {
+    return true;
+}
+
+bool View::OnUserUpdate(float elapsedTime) {
+    draw();
+    return true;
+}
+
+void View::draw() {
+    Clear(wall_);
+
+    for (size_t row = 0; row < MAP_HEIGHT; ++row) {
+       for (size_t col = 0; col < MAP_WIDTH; ++col) {
+           if (model_.maze_[row][col]) {
+               Draw(col, row, floor_);
+           }
+       }
+   }
 }
 
 int main() {
     srand(time(NULL));
 
-    auto maze = makeMaze();
+    Model model;
+    View view(model);
 
-    draw(maze);
+    if (view.Construct(MAP_WIDTH + 1, MAP_HEIGHT, CELL_WIDTH, CELL_HEIGHT)) {
+        view.Start();
+    }
 
     return 0;
 }
