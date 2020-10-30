@@ -1,2 +1,9 @@
-*.o
-testmaze
+.vscode/
+debug/*.d
+debug/*.o
+debug/testmaze
+debug/valgrind.log
+release/*.d
+release/*.o
+release/testmaze
+release/valgrind.log
