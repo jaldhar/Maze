@@ -7,9 +7,10 @@
 
 constexpr int MAP_HEIGHT = 17;
 constexpr int MAP_WIDTH = 17;
-constexpr float CELL_HEIGHT = 32;
-constexpr float CELL_WIDTH = 32;
-constexpr float TICK = 1 / 60.0f;
+constexpr int CELL_HEIGHT = 4;
+constexpr int CELL_WIDTH = 4;
+constexpr int SCALE = 8;
+constexpr float TICK = 1.0f / 60.0f;
 
 using Maze = std::array<std::array<bool, MAP_WIDTH>, MAP_HEIGHT>;
 
@@ -31,9 +32,9 @@ public:
     Position exit_;
     Position player_;
     float tick_;
+    GO direction_;
 
 private:
-    GO direction_;
 
     Maze makeMaze();
     Position makeEntrance();
@@ -230,24 +231,66 @@ public:
 
 private:
     Model& model_;
-    olc::Pixel wall_;
-    olc::Pixel floor_;
-    olc::Pixel player_;
+    std::unique_ptr<olc::Sprite> wall_;
+    std::unique_ptr<olc::Sprite> floor_;
+    std::unique_ptr<olc::Sprite> playerEast_;
+    std::unique_ptr<olc::Sprite> playerNorth_;
+    std::unique_ptr<olc::Sprite> playerSouth_;
+    std::unique_ptr<olc::Sprite> playerWest_;
 };
 
-View::View(Model model) : model_{model}, wall_{olc::BLACK},
-floor_{olc::WHITE}, player_{olc::MAGENTA} {
+View::View(Model model) : model_{model},
+wall_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
+floor_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
+playerEast_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
+playerNorth_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
+playerSouth_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
+playerWest_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)} {
     sAppName = "Maze Demo";
 }
 
 bool View::OnUserCreate() {
+    for (auto row = 0; row < CELL_HEIGHT; ++row) {
+        for (auto col = 0; col < CELL_WIDTH; ++col) {
+            wall_->SetPixel(col, row, olc::BLACK);
+
+            floor_->SetPixel(col, row, olc::WHITE);
+
+            if (col < 2 || row == 1 || row == 2) {
+                playerEast_->SetPixel(col, row, olc::MAGENTA);
+            } else {
+                playerEast_->SetPixel(col, row, olc::WHITE);
+            }
+
+            if (row > 1 || col == 1 || col == 2) {
+                playerNorth_->SetPixel(col, row, olc::MAGENTA);
+            } else {
+                playerNorth_->SetPixel(col, row, olc::WHITE);
+            }
+
+            if (row < 2 || col == 1 || col == 2) {
+                playerSouth_->SetPixel(col, row, olc::MAGENTA);
+            } else {
+                playerSouth_->SetPixel(col, row, olc::WHITE);
+            }
+
+            if (col > 1 || row == 1 || row == 2) {
+                playerWest_->SetPixel(col, row, olc::MAGENTA);
+            } else {
+                playerWest_->SetPixel(col, row, olc::WHITE);
+            }
+        }
+    }
+
+    draw();
+
     return true;
 }
 
 bool View::OnUserUpdate(float elapsedTime) {
     model_.tick_ += elapsedTime;
 
-    if (model_.tick_ > TICK) {
+    if (model_.tick_ >= TICK) {
         model_.tick_ = 0;
         model_.update();
         draw();
@@ -257,17 +300,35 @@ bool View::OnUserUpdate(float elapsedTime) {
 }
 
 void View::draw() {
-    Clear(wall_);
+    Clear(olc::BLACK);
 
     for (size_t row = 0; row < MAP_HEIGHT; ++row) {
        for (size_t col = 0; col < MAP_WIDTH; ++col) {
            if (model_.maze_[row][col]) {
-               Draw(col, row, floor_);
+               DrawSprite(col * CELL_WIDTH, row * CELL_HEIGHT, floor_.get());
+           } else {
+               DrawSprite(col * CELL_WIDTH, row * CELL_HEIGHT, wall_.get());
            }
        }
-   }
+    }
 
-   Draw(model_.player_.col_, model_.player_.row_, player_);
+    olc::Sprite* player = nullptr;
+    switch(model_.direction_) {
+        case GO::EAST:
+            player = playerEast_.get();
+            break;
+        case GO::NORTH:
+            player = playerNorth_.get();
+            break;
+        case GO::SOUTH:
+            player = playerSouth_.get();
+            break;
+        case GO::WEST:
+            player = playerWest_.get();
+            break;
+    }
+    DrawSprite(model_.player_.col_ * CELL_WIDTH,
+        model_.player_.row_ * CELL_HEIGHT, player);
 }
 
 int main() {
@@ -276,7 +337,8 @@ int main() {
     Model model;
     View view(model);
 
-    if (view.Construct(MAP_WIDTH + 1, MAP_HEIGHT, CELL_WIDTH, CELL_HEIGHT)) {
+    if (view.Construct(MAP_WIDTH * CELL_WIDTH, MAP_HEIGHT * CELL_HEIGHT, SCALE,
+    SCALE)) {
         view.Start();
     }
 
