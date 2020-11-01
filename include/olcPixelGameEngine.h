@@ -344,7 +344,10 @@ namespace olc
 		union
 		{
 			uint32_t n = nDefaultPixel;
+			#pragma GCC diagnostic push
+			#pragma GCC diagnostic ignored "-Wpedantic"
 			struct { uint8_t r; uint8_t g; uint8_t b; uint8_t a; };
+			#pragma GCC diagnostic pop
 		};
 
 		enum Mode { NORMAL, MASK, ALPHA, CUSTOM };
@@ -511,6 +514,7 @@ namespace olc
 		Sprite(const std::string& sImageFile, olc::ResourcePack* pack = nullptr);
 		Sprite(int32_t w, int32_t h);
 		Sprite(const olc::Sprite&) = delete;
+		olc::Sprite& operator=(const olc::Sprite&) = delete;
 		~Sprite();
 
 	public:
@@ -541,6 +545,7 @@ namespace olc
 		static std::unique_ptr<olc::ImageLoader> loader;
 	};
 
+
 	// O------------------------------------------------------------------------------O
 	// | olc::Decal - A GPU resident storage of an olc::Sprite                        |
 	// O------------------------------------------------------------------------------O
@@ -548,6 +553,8 @@ namespace olc
 	{
 	public:
 		Decal(olc::Sprite* spr);
+		Decal(const Decal&) = delete;
+		Decal& operator=(const Decal&) = delete;
 		virtual ~Decal();
 		void Update();
 
@@ -586,7 +593,7 @@ namespace olc
 		olc::vf2d pos[4] = { { 0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f} };
 		olc::vf2d uv[4] = { { 0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}, {1.0f, 0.0f} };
 		float w[4] = { 1, 1, 1, 1 };
-		olc::Pixel tint[4] = { olc::WHITE, olc::WHITE, olc::WHITE, olc::WHITE };;
+		olc::Pixel tint[4] = { olc::WHITE, olc::WHITE, olc::WHITE, olc::WHITE };
 	};
 
 	struct DecalTriangleInstance
@@ -599,6 +606,9 @@ namespace olc
 
 	struct LayerDesc
 	{
+		LayerDesc() : vecDecalInstance{} {}
+		LayerDesc(const LayerDesc&) = default;
+		LayerDesc& operator=(const LayerDesc&) = delete;
 		olc::vf2d vOffset = { 0, 0 };
 		olc::vf2d vScale = { 1, 1 };
 		bool bShow = false;
@@ -659,6 +669,8 @@ namespace olc
 	{
 	public:
 		PixelGameEngine();
+		PixelGameEngine(const PixelGameEngine&) = delete;
+		PixelGameEngine& operator=(const PixelGameEngine&) = delete;
 		virtual ~PixelGameEngine();
 	public:
 		olc::rcode Construct(int32_t screen_w, int32_t screen_h, int32_t pixel_w, int32_t pixel_h,
@@ -857,12 +869,12 @@ namespace olc
 		// State of keyboard		
 		bool		pKeyNewState[256] = { 0 };
 		bool		pKeyOldState[256] = { 0 };
-		HWButton	pKeyboardState[256] = { 0 };
+		HWButton	pKeyboardState[256] = { { 0 } };
 
 		// State of mouse
 		bool		pMouseNewState[nMouseButtons] = { 0 };
 		bool		pMouseOldState[nMouseButtons] = { 0 };
-		HWButton	pMouseState[nMouseButtons] = { 0 };
+		HWButton	pMouseState[nMouseButtons] = { { 0 } };
 
 		// The main engine thread
 		void		EngineThread();
@@ -1209,14 +1221,14 @@ namespace olc
 	//=============================================================
 	// Resource Packs - Allows you to store files in one large 
 	// scrambled file - Thanks MaGetzUb for debugging a null char in std::stringstream bug
-	ResourceBuffer::ResourceBuffer(std::ifstream& ifs, uint32_t offset, uint32_t size)
+	ResourceBuffer::ResourceBuffer(std::ifstream& ifs, uint32_t offset, uint32_t size) : vMemory{}
 	{
 		vMemory.resize(size);
 		ifs.seekg(offset); ifs.read(vMemory.data(), vMemory.size());
 		setg(vMemory.data(), vMemory.data(), vMemory.data() + size);
 	}
 
-	ResourcePack::ResourcePack() { }
+	ResourcePack::ResourcePack() : mapFiles{}, baseFile{} { }
 	ResourcePack::~ResourcePack() { baseFile.close(); }
 
 	bool ResourcePack::AddFile(const std::string& sFile)
@@ -1373,21 +1385,21 @@ namespace olc
 		size_t c = 0;
 		for (auto s : data)	o.push_back(s ^ key[(c++) % key.size()]);
 		return o;
-	};
+	}
 
 	std::string ResourcePack::makeposix(const std::string& path)
 	{
 		std::string o;
 		for (auto s : path) o += std::string(1, s == '\\' ? '/' : s);
 		return o;
-	};
+	}
 
 	// O------------------------------------------------------------------------------O
 	// | olc::PixelGameEngine IMPLEMENTATION                                          |
 	// O------------------------------------------------------------------------------O
-	PixelGameEngine::PixelGameEngine()
+	PixelGameEngine::PixelGameEngine() : sAppName{"Undefined"}, vLayers{},
+	funcPixelMode{}, m_tp1{}, m_tp2{}
 	{
-		sAppName = "Undefined";
 		olc::PGEX::pge = this;
 
 		// Bring in relevant Platform & Rendering systems depending
@@ -2700,7 +2712,7 @@ namespace olc
 	olc::PixelGameEngine* olc::Platform::ptrPGE = nullptr;
 	olc::PixelGameEngine* olc::Renderer::ptrPGE = nullptr;
 	std::unique_ptr<ImageLoader> olc::Sprite::loader = nullptr;
-};
+}
 
 
 
@@ -2788,7 +2800,7 @@ namespace olc
 #endif
 		}
 
-		olc::rcode CreateDevice(std::vector<void*> params, bool bFullScreen, bool bVSYNC) override
+		olc::rcode CreateDevice(std::vector<void*> params, bool, bool bVSYNC) override
 		{
 #if defined(_WIN32)
 			// Create Device Context
@@ -3218,7 +3230,7 @@ namespace olc
 			return olc::rcode::FAIL;
 		}
 
-		olc::rcode SaveImageResource(olc::Sprite* spr, const std::string& sImageFile) override
+		olc::rcode SaveImageResource(olc::Sprite*, const std::string&) override
 		{
 			return olc::rcode::OK;
 		}
@@ -3528,6 +3540,11 @@ namespace olc
 		X11::XSetWindowAttributes    olc_SetWindowAttribs;
 
 	public:
+		Platform_Linux() : olc_WindowRoot{}, olc_Window{}, olc_VisualInfo{},
+		olc_ColourMap{}, olc_SetWindowAttribs{} {}
+		Platform_Linux(const Platform_Linux&) = delete;
+		Platform_Linux& operator=(const Platform_Linux&) = delete;
+
 		virtual olc::rcode ApplicationStartUp() override
 		{ return olc::rcode::OK; }
 
