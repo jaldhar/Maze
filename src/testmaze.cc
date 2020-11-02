@@ -223,7 +223,7 @@ void Model::tryWest() {
 
 class View : public olc::PixelGameEngine {
 public:
-    explicit View(Model);
+    explicit View(Model&);
 
     void draw();
     bool OnUserCreate() override;
@@ -239,7 +239,7 @@ private:
     std::unique_ptr<olc::Sprite> playerWest_;
 };
 
-View::View(Model model) : model_{model},
+View::View(Model& model) : model_{model},
 wall_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
 floor_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
 playerEast_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
