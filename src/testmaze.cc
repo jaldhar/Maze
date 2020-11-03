@@ -1,6 +1,8 @@
 #include <array>
 #include <cstdlib>
-#include <ctime>
+#include <random>
+#include <sstream>
+#include <unistd.h>
 
 #define OLC_PGE_APPLICATION
 #include "olcPixelGameEngine.h"
@@ -23,10 +25,12 @@ struct Position {
 
 class Model {
 public:
-    Model();
+    explicit Model(unsigned);
 
     void update();
 
+    unsigned seed_;
+    std::mt19937 rnd_;
     Maze maze_;
     Position entrance_;
     Position exit_;
@@ -45,8 +49,9 @@ private:
     void trySouth();
 };
 
-Model::Model() : maze_{makeMaze()},entrance_{makeEntrance()}, exit_{makeExit()},
-player_{entrance_}, tick_{0}, direction_{GO::SOUTH} {
+Model::Model(unsigned seed) : seed_{seed}, rnd_{seed_}, maze_{makeMaze()},
+entrance_{makeEntrance()}, exit_{makeExit()}, player_{entrance_}, tick_{0},
+direction_{GO::SOUTH} {
     maze_[entrance_.row_][entrance_.col_] = true;
     maze_[exit_.row_][exit_.col_] = true;
 }
@@ -94,11 +99,15 @@ Maze Model::makeMaze() {
 
     int done = 0;
 
-    do {
-        // this code is used to make sure the numbers are odd
+    std::uniform_int_distribution<int> height(1, (MAP_HEIGHT / 2));
+    std::uniform_int_distribution<int> width(1,  (MAP_WIDTH / 2));
+    std::uniform_int_distribution<int> direction(0, 4);
 
-        int row = 1 + rand() % ((MAP_HEIGHT - 1) / 2) * 2;
-        int col = 1 + rand() % ((MAP_WIDTH - 1) / 2) * 2;
+    do {
+        // this code is used to make sure rows and columns are odd
+
+        int row = 1 + (height(rnd_) - 1) * 2;
+        int col = 1 + (width(rnd_) - 1) * 2;
 
         if (done == 0) {
             maze[row][col] = true;
@@ -107,13 +116,13 @@ Maze Model::makeMaze() {
         if(maze[row][col]) {
 
             //Randomize Directions
-            std::random_shuffle(dirs.begin(), dirs.end());
+            std::shuffle(dirs.begin(), dirs.end(), rnd_);
 
             bool blocked = true;
 
             do {
-                if (rand() % 5 == 0) {
-                    std::random_shuffle(dirs.begin(), dirs.end());
+                if (direction(rnd_) == 0) {
+                    std::shuffle(dirs.begin(), dirs.end(), rnd_);
                 }
                 blocked = true;
                 for (auto i = 0; i < 4; i++) {
@@ -121,7 +130,8 @@ Maze Model::makeMaze() {
                     auto r = row + dirs[i].row_ * 2;
                     auto c = col + dirs[i].col_ * 2;
                     //Check to see if the tile can be used
-                    if (r >= 1 && r < MAP_HEIGHT - 1 && c >= 1 && c < MAP_WIDTH - 1) {
+                    if (r >= 1 && r < MAP_HEIGHT - 1 && c >= 1 &&
+                    c < MAP_WIDTH - 1) {
                         if (!maze[r][c]) {
                             //create destination location
                             maze[r][c] = true;
@@ -155,7 +165,9 @@ Position Model::makeEntrance() {
         }
     }
 
-    return {0, freeCols[rand() % freeCols.size()] };
+    std::uniform_int_distribution<int> col(0,freeCols.size() - 1);
+
+    return {0, freeCols[col(rnd_)] };
 }
 
 // Set the exit on the bottom row.  it has to be below an empty cell on the
@@ -169,7 +181,9 @@ Position Model::makeExit() {
         }
     }
 
-    return {MAP_HEIGHT - 1, freeCols[rand() % freeCols.size()] };
+    std::uniform_int_distribution<int> col(0,freeCols.size() - 1);
+
+    return {MAP_HEIGHT - 1, freeCols[col(rnd_)] };
 }
 
 void Model::tryNorth() {
@@ -246,7 +260,9 @@ playerEast_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
 playerNorth_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
 playerSouth_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)},
 playerWest_{std::make_unique<olc::Sprite>(CELL_WIDTH, CELL_HEIGHT)} {
-    sAppName = "Maze Demo";
+    std::stringstream title;
+    title << "Maze Demo | seed = " << model_.seed_;
+    sAppName = title.str();
 }
 
 bool View::OnUserCreate() {
@@ -331,10 +347,38 @@ void View::draw() {
         model_.player_.row_ * CELL_HEIGHT, player);
 }
 
-int main() {
-    srand(time(NULL));
+void usage(const char* progname, int status) {
+    std::cerr <<
+        "Usage: " << progname << " [-s seed]|[-h|-?]\n"
+        << "    -s Seed for random number generator\n"
+        << "    -h,-? Display this help message\n";
+    exit(status);
+}
 
-    Model model;
+int main(int argc, char* argv[]) {
+    int opt;
+    unsigned seed = 0;
+
+    while ((opt = getopt(argc, argv, "h?s:")) != -1) {
+        switch (opt) {
+            case 's':
+                seed = std::stoul(optarg);
+                break;
+            case 'h':
+            case '?':
+                usage(argv[0], EXIT_SUCCESS);
+                break;
+            default:
+                usage(argv[0], EXIT_FAILURE);
+                break;
+        }
+    }
+
+    if (!seed) {
+        seed = std::random_device()();
+    }
+
+    Model model(seed);
     View view(model);
 
     if (view.Construct(MAP_WIDTH * CELL_WIDTH, MAP_HEIGHT * CELL_HEIGHT, SCALE,
@@ -342,5 +386,5 @@ int main() {
         view.Start();
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
