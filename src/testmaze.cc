@@ -1,3 +1,9 @@
+// testmaze -- maze demo
+// By Jaldhar H. Vyas <jaldhar@braincells.com>
+//
+// Copyright (C) 2020, Consolidated Braincells Inc.
+// "Do what thou wilt" shall be the whole of the license.
+
 #include <array>
 #include <cstdlib>
 #include <random>
